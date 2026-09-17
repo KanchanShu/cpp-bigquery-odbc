@@ -31,16 +31,18 @@ TEST(OdbcSqlStatisticsTest, EmptyTableNameReturnsEmptyResultSet) {
 
   DescriptorHandle impl_desc;
 
-  auto* stmt_handle = new StatementHandle(
-      &conn_handle, {impl_desc, impl_desc, impl_desc, impl_desc});
+  auto stmt_handle = std::make_unique<StatementHandle>(
+      &conn_handle, Descriptors{impl_desc, impl_desc, impl_desc, impl_desc});
 
-  conn_handle.GetStatementHandles().emplace(stmt_handle);
+  conn_handle.GetStatementHandles().emplace(stmt_handle.get());
 
   auto result = FetchStatisticsResultSet(*stmt_handle, "catalog", "schema", "",
                                          SQL_INDEX_ALL, SQL_QUICK);
 
   ASSERT_TRUE(result.Ok());
   EXPECT_TRUE(result->rows.empty());
+
+  conn_handle.GetStatementHandles().erase(stmt_handle.get());
 }
 
 TEST(OdbcSqlStatisticsTest, InvalidUniqueOption) {
