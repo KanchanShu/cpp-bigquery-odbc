@@ -2590,7 +2590,8 @@ SQLRETURN SQL_API SQLGetDiagRecW(SQLSMALLINT handleType, SQLHANDLE handle,
   SQLRETURN rc = SQL_SUCCESS;
   SQLRETURN status;
   SQLCHAR sql_state_buffer[kBufferLength] = {0};
-  SQLCHAR* message_text_buffer = reinterpret_cast<SQLCHAR*>(messageText);
+  constexpr SQLSMALLINT message_buffer_len = 2048;
+  SQLCHAR message_text_buffer[message_buffer_len] = {0};
   SQLSMALLINT message_text_buffer_len = 0;
   InitializeTracing("SQLGetDiagRecW");
 
@@ -2604,7 +2605,7 @@ SQLRETURN SQL_API SQLGetDiagRecW(SQLSMALLINT handleType, SQLHANDLE handle,
   // in odbc_diagnostics.h.
   rc = google::cloud::odbc_bq_driver::SQLGetDiagRecInternal(
       handleType, handle, recNumber, sql_state_buffer, nativeError,
-      message_text_buffer, messageTextBufferLen, &message_text_buffer_len);
+      message_text_buffer, message_buffer_len, &message_text_buffer_len);
 
   // Handle Unicode conversion of output parameters.
 
@@ -2614,7 +2615,16 @@ SQLRETURN SQL_API SQLGetDiagRecW(SQLSMALLINT handleType, SQLHANDLE handle,
     if (!utf16_sql_state) {
       return utf16_sql_state.GetCalculatedReturnCode();
     }
-    WriteWideToWireBuffer(*utf16_sql_state, sqlState, utf16_sql_state->size(),
+    size_t sqlstate_dest_chars = 6;
+#if defined(__linux__)
+    if (WireWcharSize() == 4) {
+      sqlstate_dest_chars = 3;
+    }
+#endif
+    size_t sqlstate_to_copy =
+        std::min<size_t>(utf16_sql_state->size(),
+                         sqlstate_dest_chars > 0 ? sqlstate_dest_chars - 1 : 0);
+    WriteWideToWireBuffer(*utf16_sql_state, sqlState, sqlstate_to_copy,
                           /*null_terminate=*/true);
   }
 
@@ -2624,17 +2634,27 @@ SQLRETURN SQL_API SQLGetDiagRecW(SQLSMALLINT handleType, SQLHANDLE handle,
     if (!utf16_msg_txt) {
       return utf16_msg_txt.GetCalculatedReturnCode();
     }
-    {
-      // messageTextBufferLen is in SQLWCHAR characters per ODBC spec.
-      size_t const dest_chars = static_cast<size_t>(messageTextBufferLen);
-      size_t const to_copy =
-          std::min<size_t>(utf16_msg_txt->size(), dest_chars);
-      std::memset(messageText, '\0', dest_chars * WireWcharSize());
-      WriteWideToWireBuffer(*utf16_msg_txt, messageText, to_copy);
+    // messageTextBufferLen is in SQLWCHAR characters per ODBC spec.
+    size_t dest_chars = static_cast<size_t>(messageTextBufferLen);
+#if defined(__linux__)
+    if (WireWcharSize() == 4) {
+      dest_chars = dest_chars / 2;
     }
+#endif
+    size_t const src_chars = utf16_msg_txt->size();
+    size_t const to_copy =
+        std::min<size_t>(src_chars, dest_chars > 0 ? dest_chars - 1 : 0);
+    WriteWideToWireBuffer(*utf16_msg_txt, messageText, to_copy,
+                          /*null_terminate=*/true);
+    // Report length in SQLWCHAR characters (not bytes), excluding null.
+    if (messageTextLen) {
+      *messageTextLen = static_cast<SQLSMALLINT>(
+          src_chars > dest_chars - 1 ? dest_chars - 1 : src_chars);
+    }
+    return (src_chars >= dest_chars) ? SQL_SUCCESS_WITH_INFO : rc;
   }
-  if (messageTextLen) *messageTextLen = message_text_buffer_len;
 
+  if (messageTextLen) *messageTextLen = 0;
   return rc;
 }
 
