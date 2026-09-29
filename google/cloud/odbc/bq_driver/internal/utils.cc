@@ -58,12 +58,9 @@ WireEncoding GetEffectiveWireEncoding() {
   if (configured != WireEncoding::kDefault) {
     return configured;
   }
-#if defined(__APPLE__)
-  return WireEncoding::kUtf32Le;
-#else
-  return sizeof(SQLWCHAR) == 2 ? WireEncoding::kUtf16Le
-                               : WireEncoding::kUtf32Le;
-#endif
+  // Default is based on compile-time SQLWCHAR size
+  return (sizeof(SQLWCHAR) == 2) ? WireEncoding::kUtf16Le
+                                 : WireEncoding::kUtf32Le;
 }
 
 size_t WireWcharSize() {
