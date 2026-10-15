@@ -17,12 +17,17 @@
 
 #include "google/cloud/odbc/internal/odbc_includes.h"
 #include <opentelemetry/trace/provider.h>
+#include "google/cloud/options.h"
 #include <opentelemetry/trace/scope.h>
 #include <opentelemetry/trace/span.h>
 #include <memory>
 #include <string>
 
 namespace google::cloud::odbc_internal {
+
+struct OdbcTracerOption {
+  using Type = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer>;
+};
 
 struct OtelConfig {
   bool enable_telemetry = false;
@@ -74,6 +79,7 @@ namespace google::cloud::odbc_bq_driver_internal {
 using ::google::cloud::odbc_internal::OdbcOpenTelemetry;
 using ::google::cloud::odbc_internal::OdbcSpanScope;
 using ::google::cloud::odbc_internal::OtelConfig;
+using ::google::cloud::odbc_internal::OdbcTracerOption;
 using ::google::cloud::odbc_internal::RedactSql;
 }  // namespace google::cloud::odbc_bq_driver_internal
 

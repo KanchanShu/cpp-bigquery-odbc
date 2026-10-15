@@ -179,12 +179,13 @@ SQLRETURN SQLFetchInternal(SQLHSTMT statement_handle) {
 
   std::unique_ptr<OdbcSpanScope> fetch_span;
   if (handle.GetConnectionHandle() &&
-      handle.GetConnectionHandle()->GetDsn().enable_telemetry) {
+      handle.GetConnectionHandle()->GetTracer()) {
     auto parent =
         handle.GetHtapiStreamSpan()
             ? handle.GetHtapiStreamSpan()->GetSpan()
             : opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>();
-    fetch_span = std::make_unique<OdbcSpanScope>("odbc.sql.fetch", parent);
+    fetch_span = std::make_unique<OdbcSpanScope>(
+        "odbc.sql.fetch", handle.GetConnectionHandle()->GetTracer(), parent);
   }
 
   if (handle.GetStmtState() == StmtStates::kStatementExecutedWithoutRs) {
@@ -390,8 +391,9 @@ SQLRETURN SQLGetTypeInfoInternal(SQLHSTMT stmt_handle, SQLSMALLINT data_type) {
 
   std::unique_ptr<OdbcSpanScope> span;
   if (handle.GetConnectionHandle() &&
-      handle.GetConnectionHandle()->GetDsn().enable_telemetry) {
-    span = std::make_unique<OdbcSpanScope>("odbc.catalog");
+      handle.GetConnectionHandle()->GetTracer()) {
+    span = std::make_unique<OdbcSpanScope>(
+        "odbc.catalog", handle.GetConnectionHandle()->GetTracer());
     if (span->GetSpan()) {
       span->GetSpan()->SetAttribute("db.operation.name", "SQLGetTypeInfo");
     }

@@ -310,7 +310,11 @@ StatusRecordOr<PostQueryResults> Query(JobClient& job_client,
   LOG(INFO) << "Query:: Request body: " << post_query_request.DebugString("");
   auto max_retries = options.get<MaxRetriesOption>();
 
-  OdbcSpanScope span("bigquery.query.submit");
+  auto tracer =
+      options.has<google::cloud::odbc_internal::OdbcTracerOption>()
+          ? options.get<google::cloud::odbc_internal::OdbcTracerOption>()
+          : opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer>();
+  OdbcSpanScope span("bigquery.query.submit", tracer);
   if (span.GetSpan()) {
     span.GetSpan()->SetAttribute("bigquery.location", query_request.location());
   }
@@ -434,7 +438,11 @@ StatusRecordOr<GetQueryResults> FilterQueryResults(
             << get_query_results_request.DebugString("");
   auto max_retries = options.get<MaxRetriesOption>();
 
-  OdbcSpanScope span("bigquery.query.results");
+  auto tracer =
+      options.has<google::cloud::odbc_internal::OdbcTracerOption>()
+          ? options.get<google::cloud::odbc_internal::OdbcTracerOption>()
+          : opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer>();
+  OdbcSpanScope span("bigquery.query.results", tracer);
   if (span.GetSpan()) {
     span.GetSpan()->SetAttribute("bigquery.job_id", job_id);
     if (!location.empty()) {

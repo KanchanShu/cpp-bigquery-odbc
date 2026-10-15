@@ -834,9 +834,9 @@ StatusRecord FetchBQDataReadArrow(StatementHandle& stmt_handle,
   auto bq_client = stmt_handle.GetConnectionHandle()->GetClient();
 
   std::unique_ptr<OdbcSpanScope> session_span;
-  if (conn_handle.GetDsn().enable_telemetry) {
-    session_span =
-        std::make_unique<OdbcSpanScope>("bigquery.htapi.create_session");
+  if (conn_handle.GetTracer()) {
+    session_span = std::make_unique<OdbcSpanScope>(
+        "bigquery.htapi.create_session", conn_handle.GetTracer());
   }
 
   auto read_session_status =
@@ -874,9 +874,9 @@ StatusRecord FetchBQDataReadArrow(StatementHandle& stmt_handle,
             bq_client->GetReadRowsStream(read_rows_request, options);
     stmt_handle.SetReadRowsStream(std::move(read_rows_stream));
 
-    if (conn_handle.GetDsn().enable_telemetry) {
-      stmt_handle.SetHtapiStreamSpan(
-          std::make_shared<OdbcSpanScope>("bigquery.htapi.read_stream"));
+    if (conn_handle.GetTracer()) {
+      stmt_handle.SetHtapiStreamSpan(std::make_shared<OdbcSpanScope>(
+          "bigquery.htapi.read_stream", conn_handle.GetTracer()));
     }
 
     return ReadNextResultsFromStream(stmt_handle);
@@ -1092,8 +1092,9 @@ StatusRecord FetchBQDataReadFromJob(StatementHandle& stmt_handle,
   auto bq_client = conn_handle.GetClient();
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (conn_handle.GetDsn().enable_telemetry) {
-    span = std::make_unique<OdbcSpanScope>("bigquery.htapi.job_wait");
+  if (conn_handle.GetTracer()) {
+    span = std::make_unique<OdbcSpanScope>("bigquery.htapi.job_wait",
+                                           conn_handle.GetTracer());
     if (span->GetSpan()) {
       span->GetSpan()->SetAttribute("bigquery.job_id", job_ref.job_id);
     }
@@ -1257,6 +1258,10 @@ StatusRecordOr<GetQueryResults> FetchNextPageOfQueryResults(
 
   auto* connection_handle = stmt_handle.GetConnectionHandle();
   Options options;
+  if (connection_handle && connection_handle->GetTracer()) {
+    options.set<google::cloud::odbc_internal::OdbcTracerOption>(
+        connection_handle->GetTracer());
+  }
   auto job_client = stmt_handle.GetConnectionHandle()->GetClient();
 
   LOG(INFO) << "FetchNextPageOfQueryResults:: Request body: "

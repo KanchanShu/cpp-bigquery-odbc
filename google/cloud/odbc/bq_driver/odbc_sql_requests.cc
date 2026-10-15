@@ -491,6 +491,10 @@ StatusRecord ActuallyGetMoreResults(StatementHandle& stmt_handle) {
 
   // Fetch query results from BigQuery.
   Options options;
+  if (conn_handle.GetTracer()) {
+    options.set<google::cloud::odbc_internal::OdbcTracerOption>(
+        conn_handle.GetTracer());
+  }
   std::chrono::milliseconds job_timeout(100000);
   auto ds_status_record_or = conn_handle.GetClient()->GetAllQueryResults(
       conn_handle.GetDsn().catalog, job_id, "", job_timeout, options);
@@ -873,8 +877,9 @@ SQLRETURN SQLPrepareInternal(SQLHSTMT statement_handle,
 
   std::unique_ptr<OdbcSpanScope> span;
   if (handle_ref.GetConnectionHandle() &&
-      handle_ref.GetConnectionHandle()->GetDsn().enable_telemetry) {
-    span = std::make_unique<OdbcSpanScope>("odbc.sql.prepare");
+      handle_ref.GetConnectionHandle()->GetTracer()) {
+    span = std::make_unique<OdbcSpanScope>(
+        "odbc.sql.prepare", handle_ref.GetConnectionHandle()->GetTracer());
   }
 
   if ((in_text_length < 1) && (in_text_length != SQL_NTS)) {
@@ -971,8 +976,9 @@ SQLRETURN SQLExecuteInternal(SQLHSTMT statement_handle) {
 
   std::unique_ptr<OdbcSpanScope> exec_span;
   if (stmt_handle.GetConnectionHandle() &&
-      stmt_handle.GetConnectionHandle()->GetDsn().enable_telemetry) {
-    exec_span = std::make_unique<OdbcSpanScope>("odbc.sql.execute");
+      stmt_handle.GetConnectionHandle()->GetTracer()) {
+    exec_span = std::make_unique<OdbcSpanScope>(
+        "odbc.sql.execute", stmt_handle.GetConnectionHandle()->GetTracer());
   }
 
   // Check if prepare is still executing from a previous async call,
@@ -1112,8 +1118,9 @@ SQLRETURN SQLExecDirectInternal(SQLHSTMT statement_handle,
 
   std::unique_ptr<OdbcSpanScope> exec_direct_span;
   if (stmt_handle.GetConnectionHandle() &&
-      stmt_handle.GetConnectionHandle()->GetDsn().enable_telemetry) {
-    exec_direct_span = std::make_unique<OdbcSpanScope>("odbc.sql.exec_direct");
+      stmt_handle.GetConnectionHandle()->GetTracer()) {
+    exec_direct_span = std::make_unique<OdbcSpanScope>(
+        "odbc.sql.exec_direct", stmt_handle.GetConnectionHandle()->GetTracer());
   }
 
   if ((in_text_length < 1) && (in_text_length != SQL_NTS)) {
