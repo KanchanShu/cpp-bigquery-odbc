@@ -876,7 +876,7 @@ SQLRETURN SQLPrepareInternal(SQLHSTMT statement_handle,
   StatementHandle& handle_ref = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle_ref.GetConnectionHandle() &&
+  if (handle_ref.GetConnectionHandle() != nullptr &&
       handle_ref.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.sql.prepare", handle_ref.GetConnectionHandle()->GetTracer());
@@ -949,7 +949,7 @@ SQLRETURN SQLPrepareInternal(SQLHSTMT statement_handle,
     return SQL_STILL_EXECUTING;
   }
 
-  if (span && span->GetSpan() && handle_ref.GetConnectionHandle() &&
+  if (span && span->GetSpan() && handle_ref.GetConnectionHandle() != nullptr &&
       handle_ref.GetConnectionHandle()->GetDsn().opentelemetry_capture_sql) {
     span->GetSpan()->SetAttribute("db.statement", RedactSql(query_str));
   }
@@ -975,7 +975,7 @@ SQLRETURN SQLExecuteInternal(SQLHSTMT statement_handle) {
   StatementHandle& stmt_handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> exec_span;
-  if (stmt_handle.GetConnectionHandle() &&
+  if (stmt_handle.GetConnectionHandle() != nullptr &&
       stmt_handle.GetConnectionHandle()->GetTracer()) {
     exec_span = std::make_unique<OdbcSpanScope>(
         "odbc.sql.execute", stmt_handle.GetConnectionHandle()->GetTracer());
@@ -1117,7 +1117,7 @@ SQLRETURN SQLExecDirectInternal(SQLHSTMT statement_handle,
   StatementHandle& stmt_handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> exec_direct_span;
-  if (stmt_handle.GetConnectionHandle() &&
+  if (stmt_handle.GetConnectionHandle() != nullptr &&
       stmt_handle.GetConnectionHandle()->GetTracer()) {
     exec_direct_span = std::make_unique<OdbcSpanScope>(
         "odbc.sql.exec_direct", stmt_handle.GetConnectionHandle()->GetTracer());
@@ -1257,7 +1257,7 @@ SQLRETURN SQLExecDirectInternal(SQLHSTMT statement_handle,
   // STEP 4: Synchronous execution
   // *****************************************************************
   if (exec_direct_span && exec_direct_span->GetSpan() &&
-      stmt_handle.GetConnectionHandle() &&
+      stmt_handle.GetConnectionHandle() != nullptr &&
       stmt_handle.GetConnectionHandle()->GetDsn().opentelemetry_capture_sql) {
     exec_direct_span->GetSpan()->SetAttribute("db.statement",
                                               RedactSql(query_str));

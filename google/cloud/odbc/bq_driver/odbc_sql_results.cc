@@ -178,7 +178,7 @@ SQLRETURN SQLFetchInternal(SQLHSTMT statement_handle) {
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> fetch_span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     auto parent =
         handle.GetHtapiStreamSpan()
@@ -390,7 +390,7 @@ SQLRETURN SQLGetTypeInfoInternal(SQLHSTMT stmt_handle, SQLSMALLINT data_type) {
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());

@@ -16,8 +16,8 @@
 #define CPP_BIGQUERY_ODBC_GOOGLE_CLOUD_ODBC_INTERNAL_ODBC_OPENTELEMETRY_H
 
 #include "google/cloud/odbc/internal/odbc_includes.h"
-#include <opentelemetry/trace/provider.h>
 #include "google/cloud/options.h"
+#include <opentelemetry/trace/provider.h>
 #include <opentelemetry/trace/scope.h>
 #include <opentelemetry/trace/span.h>
 #include <memory>
@@ -78,8 +78,8 @@ std::string RedactSql(std::string const& sql);
 namespace google::cloud::odbc_bq_driver_internal {
 using ::google::cloud::odbc_internal::OdbcOpenTelemetry;
 using ::google::cloud::odbc_internal::OdbcSpanScope;
-using ::google::cloud::odbc_internal::OtelConfig;
 using ::google::cloud::odbc_internal::OdbcTracerOption;
+using ::google::cloud::odbc_internal::OtelConfig;
 using ::google::cloud::odbc_internal::RedactSql;
 }  // namespace google::cloud::odbc_bq_driver_internal
 

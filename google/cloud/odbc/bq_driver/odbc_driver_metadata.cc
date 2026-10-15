@@ -290,7 +290,7 @@ SQLRETURN SQLPrimaryKeysInternal(SQLHSTMT stmt_handle,
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());
@@ -367,7 +367,7 @@ SQLRETURN SQLSpecialColumnsInternal(
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());
@@ -477,7 +477,7 @@ SQLRETURN SQLForeignKeysInternal(
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());
@@ -562,7 +562,7 @@ SQLRETURN SQLTablesInternal(SQLHSTMT stmt_handle, SQLCHAR* catalog_name,
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());
@@ -720,7 +720,7 @@ SQLRETURN SQLColumnsInternal(SQLHSTMT stmt_handle, SQLCHAR* catalog_name,
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());
@@ -891,7 +891,7 @@ SQLRETURN SQLProcedureInternal(SQLHSTMT stmt_handle, SQLCHAR* catalog_name,
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());
@@ -1017,7 +1017,7 @@ SQLRETURN SQLProcedureColumnsInternal(
   StatementHandle& handle = *(*handle_result);
 
   std::unique_ptr<OdbcSpanScope> span;
-  if (handle.GetConnectionHandle() &&
+  if (handle.GetConnectionHandle() != nullptr &&
       handle.GetConnectionHandle()->GetTracer()) {
     span = std::make_unique<OdbcSpanScope>(
         "odbc.catalog", handle.GetConnectionHandle()->GetTracer());

@@ -1258,7 +1258,7 @@ StatusRecordOr<GetQueryResults> FetchNextPageOfQueryResults(
 
   auto* connection_handle = stmt_handle.GetConnectionHandle();
   Options options;
-  if (connection_handle && connection_handle->GetTracer()) {
+  if (connection_handle != nullptr && connection_handle->GetTracer()) {
     options.set<google::cloud::odbc_internal::OdbcTracerOption>(
         connection_handle->GetTracer());
   }
