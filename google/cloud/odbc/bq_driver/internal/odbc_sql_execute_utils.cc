@@ -760,9 +760,6 @@ bool IsTransientStreamError(google::cloud::Status const& status) {
           message.find("broken pipe") != std::string::npos ||
           message.find("connection closed") != std::string::npos ||
           message.find("socket closed") != std::string::npos ||
-          message.find("timeout") != std::string::npos ||
-          message.find("timed out") != std::string::npos ||
-          message.find("proxy") != std::string::npos ||
           message.find("transport: lost connection") != std::string::npos) {
         return true;
       }
@@ -788,10 +785,7 @@ StatusRecord ReadNextResultsFromStream(StatementHandle& stmt_handle) {
         "Invalid or null BQ Client within the connection handle"};
   }
 
-  int max_retries = conn_handle->GetDsn().max_retries;
-  if (max_retries <= 0) {
-    max_retries = 3;
-  }
+  int max_retries = static_cast<int>(conn_handle->GetDsn().max_retries);
 
   google::cloud::ExponentialBackoffPolicy backoff(
       std::chrono::milliseconds(100), std::chrono::milliseconds(2000), 2.0);
@@ -834,9 +828,34 @@ StatusRecord ReadNextResultsFromStream(StatementHandle& stmt_handle) {
     }
     auto& it = *optional_it;
     if (it != read_rows_stream.end()) {
+      char const* inject_env =
+          std::getenv("BIGQUERY_ODBC_TEST_INJECT_STREAM_ERROR");
+      bool has_injected_error = false;
+      google::cloud::Status injected_status;
+      if (inject_env && std::string_view(inject_env) == "1" &&
+          stmt_handle.GetStreamRowOffset() > 0) {
+        injected_status = google::cloud::Status(
+            google::cloud::StatusCode::kUnavailable,
+            "transport: stream received RST_STREAM with error code: 8");
+        std::string record =
+            "RESUMED_AT_OFFSET=" +
+            std::to_string(stmt_handle.GetStreamRowOffset()) + ";ERROR=" +
+            google::cloud::StatusCodeToString(injected_status.code()) +
+            ": RST_STREAM";
+#ifdef _WIN32
+        _putenv_s("BIGQUERY_ODBC_TEST_INJECT_STREAM_ERROR", record.c_str());
+#else
+        setenv("BIGQUERY_ODBC_TEST_INJECT_STREAM_ERROR", record.c_str(), 1);
+#endif
+        LOG(WARNING) << "[TEST HOOK] Injected transient stream error "
+                        "(RST_STREAM) at row offset "
+                     << stmt_handle.GetStreamRowOffset();
+        has_injected_error = true;
+      }
       auto const& read_row_status = *it;
-      if (!read_row_status) {
-        google::cloud::Status status = read_row_status.status();
+      if (has_injected_error || !read_row_status) {
+        google::cloud::Status status =
+            has_injected_error ? injected_status : read_row_status.status();
         if (IsTransientStreamError(status) && attempt < max_retries) {
           auto delay = backoff.OnCompletion();
           LOG(WARNING) << "Transient error on HTAPI stream: " << status
