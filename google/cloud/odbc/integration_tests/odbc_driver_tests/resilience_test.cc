@@ -14,7 +14,6 @@
 
 #include "google/cloud/odbc/testing/odbc_utils/connection.h"
 #include "google/cloud/odbc/testing/odbc_utils/statement.h"
-#include <gmock/gmock.h>
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -25,8 +24,6 @@
 #include <string>
 #include <string_view>
 #include <thread>
-
-using ::testing::HasSubstr;
 
 namespace google::cloud::odbc_tests {
 
@@ -294,33 +291,21 @@ TEST(ResilienceTest, ReadAPI_IdleProxy_ConnectionDroppedBetweenQueries) {
   EXPECT_EQ(Disconnect(conn), SQL_SUCCESS);
 }
 
-struct ScopedEnvVar {
-  char const* name;
-  ScopedEnvVar(char const* env_name, char const* value) : name(env_name) {
-#ifdef _WIN32
-    _putenv_s(name, value);
-#else
-    setenv(name, value, 1);
-#endif
-  }
-  ~ScopedEnvVar() {
-#ifdef _WIN32
-    _putenv_s(name, "");
-#else
-    unsetenv(name);
-#endif
-  }
-};
-
 TEST(StatementTest, SQLExecDirect_HTAPI_StreamRetryAndResume) {
-  ScopedEnvVar env_guard("BIGQUERY_ODBC_TEST_INJECT_STREAM_ERROR", "1");
+  auto const config = GetIdleProxyConfig();
+  if (!config) {
+    GTEST_SKIP() << "Set BQ_ODBC_IDLE_PROXY=host:port to run idle proxy tests";
+  }
+
+  IdleProxyStats const before =
+      GetIdleProxyStats(config->stats_file, config->kills_file);
 
   auto conn = std::make_shared<ODBCHandles>();
   std::string connection_string =
-      kDefaultConnectionString +
-      ";AllowHtapiForLargeResults=1;UseDefaultLargeResultsDataset=0;"
+      IdleProxyConnString(*config) +
+      ";UseDefaultLargeResultsDataset=0;"
       "LargeResultsDataSetId=_bqodbc_temp_tables_euwest1";
-  EXPECT_EQ(Connect(connection_string, conn), SQL_SUCCESS);
+  ASSERT_EQ(Connect(connection_string, conn), SQL_SUCCESS);
 
   int const limit = 3000;
   std::string query =
@@ -332,15 +317,20 @@ TEST(StatementTest, SQLExecDirect_HTAPI_StreamRetryAndResume) {
   Table table("Random_table_name");
   RowWiseResults const& results = table.Fetch(conn, query);
 
-  // Assert proof of issue reproduction, error caught, and reconnection:
-  // The driver captures the injected error and records the resumption offset.
-  char const* test_status =
-      std::getenv("BIGQUERY_ODBC_TEST_INJECT_STREAM_ERROR");
-  ASSERT_NE(test_status, nullptr)
-      << "Verification failed: Transient stream error was never injected or "
-         "reconnection never fired!";
-  EXPECT_THAT(test_status, HasSubstr("RESUMED_AT_OFFSET="));
-  EXPECT_THAT(test_status, HasSubstr("ERROR=UNAVAILABLE: RST_STREAM"));
+  IdleProxyStats const after =
+      GetIdleProxyStats(config->stats_file, config->kills_file);
+
+  int const kills = after.kills - before.kills;
+  int const reconnects = after.reconnects - before.reconnects;
+  int const storage_tunnels = after.storage_tunnels - before.storage_tunnels;
+
+  EXPECT_GE(storage_tunnels, 3)
+      << "Expected initial and reconnected BigQuery Storage tunnels through "
+         "the proxy";
+  EXPECT_GE(kills, 2)
+      << "Expected proxy to kill the active HTAPI stream mid-query";
+  EXPECT_GE(reconnects, 2)
+      << "Expected driver to reconnect and resume HTAPI stream after drops";
 
   int const expected_num_cols = 300;
   ASSERT_EQ(results.size(), limit) << "Row count mismatch.";

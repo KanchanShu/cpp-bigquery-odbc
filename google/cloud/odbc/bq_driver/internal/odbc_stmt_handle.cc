@@ -570,9 +570,6 @@ void StatementHandle::CloseCursor() {
 #if (!defined(_WIN32) || defined(_WIN64)) && !defined(NO_ARROW)
   ClearReadRowsStream();
   ClearReadRowsIterator();
-  ClearReadStreamName();
-  ResetStreamRowOffset();
-  SetWasHtapiEnabled(false);
 #endif
   if (StatementPrepared()) {
     SetStmtState(StmtStates::kStatementPrepared);
