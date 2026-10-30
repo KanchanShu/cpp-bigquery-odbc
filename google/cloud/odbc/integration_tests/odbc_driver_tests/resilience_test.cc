@@ -14,6 +14,7 @@
 
 #include "google/cloud/odbc/testing/odbc_utils/connection.h"
 #include "google/cloud/odbc/testing/odbc_utils/statement.h"
+#include <gmock/gmock.h>
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -24,6 +25,8 @@
 #include <string>
 #include <string_view>
 #include <thread>
+
+using ::testing::HasSubstr;
 
 namespace google::cloud::odbc_tests {
 
@@ -288,6 +291,73 @@ TEST(ResilienceTest, ReadAPI_IdleProxy_ConnectionDroppedBetweenQueries) {
   }
 
   EXPECT_EQ(SQLFreeStmt(conn->hstmt, SQL_CLOSE), SQL_SUCCESS);
+  EXPECT_EQ(Disconnect(conn), SQL_SUCCESS);
+}
+
+struct ScopedEnvVar {
+  char const* name;
+  ScopedEnvVar(char const* env_name, char const* value) : name(env_name) {
+#ifdef _WIN32
+    _putenv_s(name, value);
+#else
+    setenv(name, value, 1);
+#endif
+  }
+  ~ScopedEnvVar() {
+#ifdef _WIN32
+    _putenv_s(name, "");
+#else
+    unsetenv(name);
+#endif
+  }
+};
+
+TEST(StatementTest, SQLExecDirect_HTAPI_StreamRetryAndResume) {
+  ScopedEnvVar env_guard("BIGQUERY_ODBC_TEST_INJECT_STREAM_ERROR", "1");
+
+  auto conn = std::make_shared<ODBCHandles>();
+  std::string connection_string =
+      kDefaultConnectionString +
+      ";AllowHtapiForLargeResults=1;UseDefaultLargeResultsDataset=0;"
+      "LargeResultsDataSetId=_bqodbc_temp_tables_euwest1";
+  EXPECT_EQ(Connect(connection_string, conn), SQL_SUCCESS);
+
+  int const limit = 3000;
+  std::string query =
+      "SELECT * EXCEPT (index) FROM "
+      "ODBC_HTAPI_TESTING_EUROPE_WEST1.300_columns_string "
+      "ORDER BY index LIMIT " +
+      std::to_string(limit) + ";";
+
+  Table table("Random_table_name");
+  RowWiseResults const& results = table.Fetch(conn, query);
+
+  // Assert proof of issue reproduction, error caught, and reconnection:
+  // The driver captures the injected error and records the resumption offset.
+  char const* test_status =
+      std::getenv("BIGQUERY_ODBC_TEST_INJECT_STREAM_ERROR");
+  ASSERT_NE(test_status, nullptr)
+      << "Verification failed: Transient stream error was never injected or "
+         "reconnection never fired!";
+  EXPECT_THAT(test_status, HasSubstr("RESUMED_AT_OFFSET="));
+  EXPECT_THAT(test_status, HasSubstr("ERROR=UNAVAILABLE: RST_STREAM"));
+
+  int const expected_num_cols = 300;
+  ASSERT_EQ(results.size(), limit) << "Row count mismatch.";
+  for (int i = 0; i < limit; ++i) {
+    Row const& row = results[i];
+    ASSERT_EQ(row.size(), expected_num_cols)
+        << "Row " << i << ": Column count mismatch.";
+    for (int j = 0; j < expected_num_cols; ++j) {
+      std::string expected_value =
+          "col" + std::to_string(j) + "_row" + std::to_string(i);
+      ASSERT_TRUE(row.count(j))
+          << "Row " << i << ": Missing expected column with index " << j;
+      ASSERT_EQ(row.at(j), expected_value)
+          << "Row " << i << ", Col " << j << ": Value mismatch.";
+    }
+  }
+
   EXPECT_EQ(Disconnect(conn), SQL_SUCCESS);
 }
 
